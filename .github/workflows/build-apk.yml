@@ -1,0 +1,50 @@
+name: Build Shqip TV APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ShqipTV-Source-Eagle.zip"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract Shqip TV source
+        run: |
+          mkdir source
+          unzip -q ShqipTV-Source-Eagle.zip -d source
+
+      - name: Build installable debug APK
+        working-directory: source
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain :app:assembleDebug
+
+      - name: Prepare APK
+        run: cp source/app/build/outputs/apk/debug/app-debug.apk ShqipTV.apk
+
+      - name: Upload Shqip TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShqipTV-APK
+          path: ShqipTV.apk
+          if-no-files-found: error
