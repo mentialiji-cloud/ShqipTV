@@ -94,6 +94,58 @@ class IptvRepository(private val context: Context) {
             }
         }
 
+    suspend fun loadSeriesEpisodes(config: ProviderConfig, series: MediaItem): List<MediaItem> =
+        withContext(Dispatchers.IO) {
+            if (!config.isXtream) return@withContext emptyList()
+            val rawSeriesId = series.id.substringAfter(':')
+            val base = config.server.trimEnd('/')
+            val api = "$base/player_api.php?username=${enc(config.username)}&password=${enc(config.password)}&action=get_series_info&series_id=$rawSeriesId"
+            val root = getJson(api).asJsonObject
+            val episodes = root.get("episodes") ?: return@withContext emptyList()
+            val episodeObjects = when {
+                episodes.isJsonObject -> episodes.asJsonObject.entrySet().flatMap { (_, value) ->
+                    if (value.isJsonArray) value.asJsonArray.map { it.asJsonObject } else emptyList()
+                }
+                episodes.isJsonArray -> episodes.asJsonArray.map { it.asJsonObject }
+                else -> emptyList()
+            }
+            episodeObjects.mapNotNull { o ->
+                val id = o.string("id")
+                if (id.isBlank()) return@mapNotNull null
+                val extension = o.string("container_extension").ifBlank { "mp4" }
+                val episodeNumber = o.string("episode_num")
+                val title = o.string("title").ifBlank { "Episode $episodeNumber" }
+                MediaItem(
+                    id = "EPISODE:$id",
+                    name = title,
+                    streamUrl = "$base/series/${enc(config.username)}/${enc(config.password)}/$id.$extension",
+                    logo = series.logo,
+                    categoryId = series.id,
+                    kind = ContentKind.SERIES,
+                    nowPlaying = series.name,
+                )
+            }
+        }
+
+    suspend fun loadShortEpg(config: ProviderConfig, channel: MediaItem): List<EpgProgram> =
+        withContext(Dispatchers.IO) {
+            if (!config.isXtream || channel.kind != ContentKind.LIVE) return@withContext emptyList()
+            val streamId = channel.id.substringAfter(':')
+            val base = config.server.trimEnd('/')
+            val url = "$base/player_api.php?username=${enc(config.username)}&password=${enc(config.password)}&action=get_short_epg&stream_id=$streamId&limit=4"
+            val root = getJson(url).asJsonObject
+            val listings = root.get("epg_listings")?.takeIf { it.isJsonArray }?.asJsonArray ?: return@withContext emptyList()
+            listings.map { element ->
+                val o = element.asJsonObject
+                EpgProgram(
+                    title = o.string("title").ifBlank { "Live program" },
+                    description = o.string("description"),
+                    start = o.string("start_timestamp").toLongOrNull() ?: 0L,
+                    end = o.string("stop_timestamp").toLongOrNull() ?: 0L,
+                )
+            }
+        }
+
     private fun categories(url: String, kind: ContentKind): List<Category> =
         getJson(url).asJsonArray.mapNotNull { element ->
             val o = element.asJsonObject

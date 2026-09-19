@@ -15,6 +15,9 @@ data class AppState(
     val favorites: Set<String> = emptySet(),
     val loading: Boolean = false,
     val loadingKinds: Set<ContentKind> = emptySet(),
+    val episodes: List<MediaItem> = emptyList(),
+    val loadingSeriesId: String? = null,
+    val epg: Map<String, List<EpgProgram>> = emptyMap(),
     val error: String? = null,
 )
 
@@ -63,6 +66,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val latest = _state.value
                     _state.value = latest.copy(loadingKinds = latest.loadingKinds - kind, error = error.message)
                 }
+        }
+    }
+    fun loadSeriesEpisodes(series: MediaItem) {
+        val current = _state.value
+        val provider = current.provider ?: return
+        if (current.loadingSeriesId == series.id || (current.episodes.firstOrNull()?.categoryId == series.id)) return
+        _state.value = current.copy(episodes = emptyList(), loadingSeriesId = series.id)
+        viewModelScope.launch {
+            runCatching { repository.loadSeriesEpisodes(provider, series) }
+                .onSuccess { episodes -> _state.value = _state.value.copy(episodes = episodes, loadingSeriesId = null) }
+                .onFailure { error -> _state.value = _state.value.copy(loadingSeriesId = null, error = error.message) }
+        }
+    }
+
+    fun loadEpg(channel: MediaItem) {
+        val current = _state.value
+        val provider = current.provider ?: return
+        if (channel.kind != ContentKind.LIVE || channel.id in current.epg) return
+        viewModelScope.launch {
+            val programs = runCatching { repository.loadShortEpg(provider, channel) }.getOrDefault(emptyList())
+            _state.value = _state.value.copy(epg = _state.value.epg + (channel.id to programs))
         }
     }
     fun signOut() { repository.clearProvider(); _state.value = AppState() }

@@ -101,6 +101,13 @@ fun PlayerScreen(
                     item.nowPlaying,
                     style = androidx.compose.ui.text.TextStyle(Color(0xFFB8C1D9), 17.sp)
                 )
+                if (item.nextPlaying.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    androidx.compose.foundation.text.BasicText(
+                        "Next: ${item.nextPlaying}",
+                        style = androidx.compose.ui.text.TextStyle(Color(0xFF8792AE), 14.sp)
+                    )
+                }
                 Spacer(Modifier.height(14.dp))
                 androidx.compose.foundation.text.BasicText(
                     "▲ ▼  Change channel     OK  Pause / Play     Back  Return",

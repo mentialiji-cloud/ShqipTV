@@ -27,6 +27,13 @@ data class MediaItem(
     val nextPlaying: String = "",
 )
 
+data class EpgProgram(
+    val title: String,
+    val description: String = "",
+    val start: Long = 0L,
+    val end: Long = 0L,
+)
+
 data class Catalog(
     val categories: List<Category> = emptyList(),
     val live: List<MediaItem> = emptyList(),

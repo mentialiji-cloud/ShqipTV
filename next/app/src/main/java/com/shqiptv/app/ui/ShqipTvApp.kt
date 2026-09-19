@@ -54,10 +54,25 @@ fun ShqipTvApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var section by remember { mutableStateOf(Section.HOME) }
     var playing by remember { mutableStateOf<MediaItem?>(null) }
+    var selectedSeries by remember { mutableStateOf<MediaItem?>(null) }
 
     if (playing != null) {
-        val playlist = state.catalog.items(playing!!.kind).filter { it.streamUrl.isNotBlank() }
-        PlayerScreen(playing!!, playlist, { playing = it }, { playing = null })
+        val current = playing!!
+        LaunchedEffect(current.id) { viewModel.loadEpg(current) }
+        val program = state.epg[current.id].orEmpty()
+        val displayItem = current.copy(
+            nowPlaying = program.getOrNull(0)?.title ?: current.nowPlaying,
+            nextPlaying = program.getOrNull(1)?.title ?: current.nextPlaying,
+        )
+        val playlist = if (current.id.startsWith("EPISODE:")) state.episodes else state.catalog.items(current.kind).filter { it.streamUrl.isNotBlank() }
+        PlayerScreen(displayItem, playlist, { playing = it }, { playing = null })
+        return
+    }
+
+    if (selectedSeries != null) {
+        val series = selectedSeries!!
+        LaunchedEffect(series.id) { viewModel.loadSeriesEpisodes(series) }
+        SeriesEpisodesScreen(series, state, { selectedSeries = null }, { playing = it })
         return
     }
 
@@ -73,7 +88,9 @@ fun ShqipTvApp(viewModel: MainViewModel) {
                     Section.SERIES -> viewModel.loadKind(ContentKind.SERIES)
                     else -> Unit
                 }
-            }, { playing = it }, viewModel::toggleFavorite, viewModel::signOut)
+            }, {
+                if (it.kind == ContentKind.SERIES && it.streamUrl.isBlank()) selectedSeries = it else playing = it
+            }, viewModel::toggleFavorite, viewModel::signOut)
         }
     }
 }
@@ -235,7 +252,7 @@ private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onP
             } else {
                 LazyVerticalGrid(GridCells.Adaptive(190.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(visible, key = { it.id }) { media ->
-                        ChannelCard(media, media.id in state.favorites, { if (media.streamUrl.isNotBlank()) onPlay(media) }, { onFavorite(media.id) })
+                        ChannelCard(media, media.id in state.favorites, { onPlay(media) }, { onFavorite(media.id) })
                     }
                 }
             }
@@ -272,6 +289,31 @@ private fun SettingsScreen(state: AppState, onSignOut: () -> Unit) {
         Spacer(Modifier.height(12.dp)); Label("${state.catalog.live.size} channels • ${state.catalog.movies.size} movies • ${state.catalog.series.size} series", 16.sp, color = TextSecondary)
         Spacer(Modifier.height(28.dp)); FocusButton("REMOVE PLAYLIST", selected = false, onClick = onSignOut)
         Spacer(Modifier.weight(1f)); Label("Shqip TV 2.0 • Built for Google TV", 14.sp, color = TextSecondary)
+    }
+}
+
+@Composable
+private fun SeriesEpisodesScreen(series: MediaItem, state: AppState, onBack: () -> Unit, onPlay: (MediaItem) -> Unit) {
+    BackHandler(onBack = onBack)
+    Row(Modifier.fillMaxSize().background(Bg).padding(38.dp)) {
+        Column(Modifier.width(250.dp)) {
+            AsyncImage(series.logo, series.name, Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(18.dp)).background(Panel))
+            Spacer(Modifier.height(18.dp)); Label(series.name, 24.sp, FontWeight.Bold)
+            Spacer(Modifier.height(12.dp)); FocusButton("BACK", false, onClick = onBack)
+        }
+        Spacer(Modifier.width(36.dp))
+        Column(Modifier.weight(1f)) {
+            Label("EPISODES", 26.sp, FontWeight.Bold); Spacer(Modifier.height(18.dp))
+            if (state.loadingSeriesId == series.id) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Label("Loading episodes…", 18.sp, color = TextSecondary) }
+            } else if (state.episodes.isEmpty()) {
+                Label("No episodes were returned by this IPTV provider.", 17.sp, color = TextSecondary)
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    items(state.episodes, key = { it.id }) { episode -> ChannelRow(episode, false, { onPlay(episode) }, {}) }
+                }
+            }
+        }
     }
 }
 
