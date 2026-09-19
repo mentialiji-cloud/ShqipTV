@@ -34,6 +34,7 @@ jobs:
           unzip -q ShqipTV-Source-Eagle.zip -d legacy
           cp legacy/gradlew legacy/gradlew.bat next/
           cp -R legacy/gradle next/
+          mkdir -p next/app/src/main/res/drawable
           cp legacy/app/src/main/res/drawable/app_banner.png next/app/src/main/res/drawable/app_banner.png
           for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
             mkdir -p "next/app/src/main/res/mipmap-$density"
