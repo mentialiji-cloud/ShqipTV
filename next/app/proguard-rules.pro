@@ -1,0 +1,2 @@
+-keep class com.shqiptv.app.data.** { *; }
+-dontwarn org.conscrypt.**
