@@ -66,7 +66,14 @@ fun ShqipTvApp(viewModel: MainViewModel) {
             state.provider == null -> LoginScreen(viewModel::connect)
             state.loading -> LoadingScreen(state.provider?.name.orEmpty())
             state.error != null -> ErrorScreen(state.error!!, viewModel::retry, viewModel::signOut)
-            else -> MainShell(state, section, { section = it }, { playing = it }, viewModel::toggleFavorite, viewModel::signOut)
+            else -> MainShell(state, section, {
+                section = it
+                when (it) {
+                    Section.MOVIES -> viewModel.loadKind(ContentKind.MOVIE)
+                    Section.SERIES -> viewModel.loadKind(ContentKind.SERIES)
+                    else -> Unit
+                }
+            }, { playing = it }, viewModel::toggleFavorite, viewModel::signOut)
         }
     }
 }
@@ -217,7 +224,9 @@ private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onP
                 Spacer(Modifier.width(18.dp)); Label("${visible.size} items", 15.sp, color = TextSecondary)
             }
             Spacer(Modifier.height(20.dp))
-            if (kind == ContentKind.LIVE) {
+            if (kind in state.loadingKinds) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Label("Loading $title…", 19.sp, color = TextSecondary) }
+            } else if (kind == ContentKind.LIVE) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(visible, key = { it.id }) { media ->
                         ChannelRow(media, media.id in state.favorites, { onPlay(media) }) { onFavorite(media.id) }

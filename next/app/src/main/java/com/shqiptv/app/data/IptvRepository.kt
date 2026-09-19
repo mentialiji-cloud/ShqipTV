@@ -73,16 +73,26 @@ class IptvRepository(private val context: Context) {
         }
 
         val liveCats = async { categories("$api&action=get_live_categories", ContentKind.LIVE) }
-        val movieCats = async { categories("$api&action=get_vod_categories", ContentKind.MOVIE) }
-        val seriesCats = async { categories("$api&action=get_series_categories", ContentKind.SERIES) }
         val live = async { xtreamItems("$api&action=get_live_streams", config, ContentKind.LIVE) }
-        val movies = async { xtreamItems("$api&action=get_vod_streams", config, ContentKind.MOVIE) }
-        val series = async { xtreamItems("$api&action=get_series", config, ContentKind.SERIES) }
         Catalog(
-            categories = liveCats.await() + movieCats.await() + seriesCats.await(),
-            live = live.await(), movies = movies.await(), series = series.await(),
+            categories = liveCats.await(),
+            live = live.await(),
         )
     }
+
+    suspend fun loadKind(config: ProviderConfig, kind: ContentKind): Pair<List<Category>, List<MediaItem>> =
+        withContext(Dispatchers.IO) {
+            if (!config.isXtream || kind == ContentKind.LIVE) return@withContext emptyList<Category>() to emptyList()
+            val base = config.server.trimEnd('/')
+            val api = "$base/player_api.php?username=${enc(config.username)}&password=${enc(config.password)}"
+            val categoryAction = if (kind == ContentKind.MOVIE) "get_vod_categories" else "get_series_categories"
+            val itemAction = if (kind == ContentKind.MOVIE) "get_vod_streams" else "get_series"
+            coroutineScope {
+                val cats = async { categories("$api&action=$categoryAction", kind) }
+                val items = async { xtreamItems("$api&action=$itemAction", config, kind) }
+                cats.await() to items.await()
+            }
+        }
 
     private fun categories(url: String, kind: ContentKind): List<Category> =
         getJson(url).asJsonArray.mapNotNull { element ->
