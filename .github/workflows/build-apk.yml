@@ -1,4 +1,4 @@
-name: Build Shqip TV APK
+name: Build and Publish Shqip TV APK
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -42,9 +42,18 @@ jobs:
       - name: Prepare APK
         run: cp source/app/build/outputs/apk/debug/app-debug.apk ShqipTV.apk
 
-      - name: Upload Shqip TV APK
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: ShqipTV-APK
           path: ShqipTV.apk
           if-no-files-found: error
+
+      - name: Publish APK download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Shqip TV v1.0.0
+          body: Installable APK for Android TV and Google TV.
+          files: ShqipTV.apk
+          make_latest: true
