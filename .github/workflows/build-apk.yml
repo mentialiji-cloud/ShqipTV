@@ -1,10 +1,10 @@
-name: Build and Publish Shqip TV APK
+name: Build and Publish Shqip TV Next
 
 on:
   push:
     branches: [main]
     paths:
-      - "ShqipTV-Source-Eagle.zip"
+      - "next/**"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
@@ -28,32 +28,38 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Extract Shqip TV source
+      - name: Prepare clean project
         run: |
-          mkdir source
-          unzip -q ShqipTV-Source-Eagle.zip -d source
+          mkdir legacy
+          unzip -q ShqipTV-Source-Eagle.zip -d legacy
+          cp legacy/gradlew legacy/gradlew.bat next/
+          cp -R legacy/gradle next/
+          cp legacy/app/src/main/res/drawable/app_banner.png next/app/src/main/res/drawable/app_banner.png
+          for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "next/app/src/main/res/mipmap-$density"
+            cp "legacy/app/src/main/res/mipmap-$density/ic_launcher_vault.png" "next/app/src/main/res/mipmap-$density/ic_launcher.png"
+          done
+          chmod +x next/gradlew
 
-      - name: Build installable debug APK
-        working-directory: source
-        run: |
-          chmod +x gradlew
-          ./gradlew --console=plain :app:assembleDebug
+      - name: Build new fast APK
+        working-directory: next
+        run: ./gradlew --console=plain :app:assembleDebug
 
       - name: Prepare APK
-        run: cp source/app/build/outputs/apk/debug/app-debug.apk ShqipTV.apk
+        run: cp next/app/build/outputs/apk/debug/app-debug.apk ShqipTV-v2.apk
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShqipTV-APK
-          path: ShqipTV.apk
+          name: ShqipTV-v2-APK
+          path: ShqipTV-v2.apk
           if-no-files-found: error
 
       - name: Publish APK download
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: Shqip TV v1.0.0
-          body: Installable APK for Android TV and Google TV.
-          files: ShqipTV.apk
+          tag_name: v2.0.0
+          name: Shqip TV 2.0 — New Fast App
+          body: Completely rebuilt Android TV IPTV player with a lightweight architecture and fast remote navigation.
+          files: ShqipTV-v2.apk
           make_latest: true
