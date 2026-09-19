@@ -64,7 +64,7 @@ fun ShqipTvApp(viewModel: MainViewModel) {
     Box(Modifier.fillMaxSize().background(Bg)) {
         when {
             state.provider == null -> LoginScreen(viewModel::connect)
-            state.loading -> LoadingScreen(state.provider.name)
+            state.loading -> LoadingScreen(state.provider?.name.orEmpty())
             state.error != null -> ErrorScreen(state.error!!, viewModel::retry, viewModel::signOut)
             else -> MainShell(state, section, { section = it }, { playing = it }, viewModel::toggleFavorite, viewModel::signOut)
         }
