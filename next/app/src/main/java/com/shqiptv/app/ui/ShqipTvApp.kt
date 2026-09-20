@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -38,6 +40,7 @@ import androidx.tv.material3.Icon
 import coil3.compose.AsyncImage
 import com.shqiptv.app.AppState
 import com.shqiptv.app.MainViewModel
+import com.shqiptv.app.R
 import com.shqiptv.app.data.*
 import com.shqiptv.app.player.PlayerScreen
 
@@ -204,7 +207,21 @@ private fun NavIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label
 @Composable
 private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (MediaItem) -> Unit) {
     val featured = state.catalog.live.firstOrNull()
-    Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 22.dp)) {
+    Box(Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.home_albania),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.horizontalGradient(
+                    listOf(Color(0xF205070D), Color(0xD905070D), Color(0x9A05070D))
+                )
+            )
+        )
+        Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 22.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Label("Shqip TV", 28.sp, FontWeight.Bold)
             Label(state.provider?.name ?: "Connected", 14.sp, color = TextSecondary)
@@ -212,7 +229,7 @@ private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (M
         Spacer(Modifier.height(16.dp))
         Box(
             Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(20.dp))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF4A080B), Color(0xFF151A25), Color(0xFF080B11))))
+                .background(Brush.horizontalGradient(listOf(Color(0xDB4A080B), Color(0xC4151A25), Color(0x90080B11))))
                 .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(20.dp))
         ) {
             Column(Modifier.align(Alignment.CenterStart).padding(28.dp)) {
@@ -245,6 +262,7 @@ private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (M
                 HomeGuideRow(channel, onPlay)
                 if (index < minOf(2, state.catalog.live.lastIndex)) HorizontalDivider(Color.White.copy(alpha = .07f))
             }
+        }
         }
     }
 }
