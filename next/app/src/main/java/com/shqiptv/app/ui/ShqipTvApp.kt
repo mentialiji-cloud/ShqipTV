@@ -2,8 +2,6 @@ package com.shqiptv.app.ui
 
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +22,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -192,7 +189,7 @@ private fun NavigationRail(selected: Section, onSelect: (Section) -> Unit) {
 @Composable
 private fun NavIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val bg by animateColorAsState(if (focused || selected) Red else Color.Transparent)
+    val bg = if (focused || selected) Red else Color.Transparent
     Row(
         Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp)).background(bg)
             .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick).padding(horizontal = 14.dp),
@@ -464,9 +461,8 @@ private fun CategoryRow(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun FocusSurface(modifier: Modifier = Modifier, onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.045f else 1f)
-    val border by animateColorAsState(if (focused) Red else Color.Transparent)
-    Box(modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(RoundedCornerShape(16.dp)).background(Panel).border(2.dp, border, RoundedCornerShape(16.dp)).onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick), content = content)
+    val border = if (focused) Red else Color.Transparent
+    Box(modifier.clip(RoundedCornerShape(16.dp)).background(Panel).border(2.dp, border, RoundedCornerShape(16.dp)).onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick), content = content)
 }
 
 @Composable

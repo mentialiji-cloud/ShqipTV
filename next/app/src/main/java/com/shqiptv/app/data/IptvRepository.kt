@@ -48,6 +48,19 @@ class IptvRepository(private val context: Context) {
 
     fun clearProvider() = prefs.edit().clear().apply()
 
+    fun cachedCatalog(): Catalog? = runCatching {
+        val file = context.filesDir.resolve("catalog-cache.json")
+        if (!file.exists()) null else gson.fromJson(file.readText(), Catalog::class.java)
+    }.getOrNull()?.takeIf { it.live.isNotEmpty() }
+
+    fun saveCatalog(catalog: Catalog) {
+        runCatching { context.filesDir.resolve("catalog-cache.json").writeText(gson.toJson(catalog)) }
+    }
+
+    fun clearCatalog() {
+        runCatching { context.filesDir.resolve("catalog-cache.json").delete() }
+    }
+
     fun favoriteIds(): Set<String> = prefs.getStringSet("favorites", emptySet())?.toSet().orEmpty()
 
     fun toggleFavorite(id: String): Set<String> {

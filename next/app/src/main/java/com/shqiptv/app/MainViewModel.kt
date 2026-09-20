@@ -23,10 +23,32 @@ data class AppState(
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = IptvRepository(app)
-    private val _state = MutableStateFlow(AppState(favorites = repository.favoriteIds()))
+    private val savedProvider = repository.savedProvider()
+    private val savedCatalog = repository.cachedCatalog()
+    private val _state = MutableStateFlow(
+        AppState(
+            provider = savedProvider,
+            catalog = savedCatalog ?: Catalog(),
+            favorites = repository.favoriteIds(),
+            loading = savedProvider != null && savedCatalog == null,
+        )
+    )
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    init { repository.savedProvider()?.let(::connect) }
+    init {
+        savedProvider?.let { provider ->
+            if (savedCatalog == null) connect(provider) else refreshInBackground(provider)
+        }
+    }
+
+    private fun refreshInBackground(config: ProviderConfig) {
+        viewModelScope.launch {
+            runCatching { repository.load(config) }.onSuccess { catalog ->
+                repository.saveCatalog(catalog)
+                _state.value = _state.value.copy(catalog = catalog, loading = false, error = null)
+            }
+        }
+    }
 
     fun connect(config: ProviderConfig) {
         _state.value = _state.value.copy(provider = config, loading = true, error = null)
@@ -34,6 +56,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { repository.load(config) }
                 .onSuccess { catalog ->
                     repository.saveProvider(config)
+                    repository.saveCatalog(catalog)
                     _state.value = _state.value.copy(catalog = catalog, loading = false)
                 }
                 .onFailure { error ->
@@ -89,7 +112,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = _state.value.copy(epg = _state.value.epg + (channel.id to programs))
         }
     }
-    fun signOut() { repository.clearProvider(); _state.value = AppState() }
+    fun signOut() { repository.clearProvider(); repository.clearCatalog(); _state.value = AppState() }
     fun toggleFavorite(id: String) { _state.value = _state.value.copy(favorites = repository.toggleFavorite(id)) }
     fun clearError() { _state.value = _state.value.copy(error = null) }
 }
