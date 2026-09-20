@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -167,13 +168,16 @@ private fun MainShell(
 @Composable
 private fun NavigationRail(selected: Section, onSelect: (Section) -> Unit) {
     Column(
-        Modifier.width(94.dp).fillMaxHeight().background(Color(0xFF080B13)).padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier.width(220.dp).fillMaxHeight().background(Color(0xFF080B13)).padding(22.dp),
     ) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(Red), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(30.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Red), contentAlignment = Alignment.Center) {
+                Label("🇦🇱", 27.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Label("Shqip TV", 24.sp, FontWeight.Bold)
         }
-        Spacer(Modifier.height(34.dp))
+        Spacer(Modifier.height(32.dp))
         val icons = listOf(Icons.Default.Home, Icons.Default.LiveTv, Icons.Default.CalendarMonth, Icons.Default.Movie, Icons.Default.VideoLibrary, Icons.Default.Favorite, Icons.Default.Settings)
         Section.entries.forEachIndexed { index, section ->
             NavIcon(icons[index], section.title, selected == section) { onSelect(section) }
@@ -186,34 +190,99 @@ private fun NavigationRail(selected: Section, onSelect: (Section) -> Unit) {
 private fun NavIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val bg by animateColorAsState(if (focused || selected) Red else Color.Transparent)
-    Box(
-        Modifier.size(62.dp, 54.dp).clip(RoundedCornerShape(15.dp)).background(bg)
-            .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = if (focused || selected) Color.White else TextSecondary, modifier = Modifier.size(25.dp)) }
+    Row(
+        Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp)).background(bg)
+            .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, label, tint = if (focused || selected) Color.White else TextSecondary, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(14.dp))
+        Label(label, 16.sp, if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, if (focused || selected) Color.White else TextSecondary)
+    }
 }
 
 @Composable
 private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (MediaItem) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(36.dp)) {
+    val featured = state.catalog.live.firstOrNull()
+    Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 22.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column { Label("Mirë se vini", 17.sp, color = TextSecondary); Label(state.provider?.name ?: "Shqip TV", 30.sp, FontWeight.Bold) }
-            Label("SHQIP TV", 18.sp, FontWeight.Bold, Red)
+            Label("Shqip TV", 28.sp, FontWeight.Bold)
+            Label(state.provider?.name ?: "Connected", 14.sp, color = TextSecondary)
         }
-        Spacer(Modifier.height(28.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            HomeTile("LIVE TV", "${state.catalog.live.size} channels", Icons.Default.LiveTv, Modifier.weight(1f)) { onSection(Section.LIVE) }
-            HomeTile("MOVIES", "${state.catalog.movies.size} titles", Icons.Default.Movie, Modifier.weight(1f)) { onSection(Section.MOVIES) }
-            HomeTile("SERIES", "${state.catalog.series.size} shows", Icons.Default.VideoLibrary, Modifier.weight(1f)) { onSection(Section.SERIES) }
+        Spacer(Modifier.height(16.dp))
+        Box(
+            Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(20.dp))
+                .background(Brush.horizontalGradient(listOf(Color(0xFF4A080B), Color(0xFF151A25), Color(0xFF080B11))))
+                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(20.dp))
+        ) {
+            Column(Modifier.align(Alignment.CenterStart).padding(28.dp)) {
+                Box(Modifier.clip(RoundedCornerShape(20.dp)).background(Red).padding(horizontal = 12.dp, vertical = 5.dp)) { Label("●  LIVE TV", 12.sp, FontWeight.Bold) }
+                Spacer(Modifier.height(12.dp))
+                Label(featured?.name ?: "Shqip TV", 34.sp, FontWeight.Bold)
+                Spacer(Modifier.height(5.dp))
+                Label(featured?.nowPlaying?.ifBlank { "Your channels. Fast and simple." } ?: "Your channels. Fast and simple.", 15.sp, color = TextSecondary)
+                Spacer(Modifier.height(16.dp))
+                FocusButton("▶  WATCH LIVE", true) { if (featured != null) onPlay(featured) else onSection(Section.LIVE) }
+            }
+            AsyncImage(featured?.logo, null, Modifier.align(Alignment.CenterEnd).padding(34.dp).size(138.dp))
         }
-        Spacer(Modifier.height(30.dp))
-        Label("Popular channels", 22.sp, FontWeight.SemiBold)
-        Spacer(Modifier.height(14.dp))
-        LazyVerticalGrid(GridCells.Adaptive(210.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(state.catalog.live.take(12), key = { it.id }) { ChannelCard(it, it.id in state.favorites, { onPlay(it) }, {}) }
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Label("Now Playing", 20.sp, FontWeight.SemiBold)
+            Label("${state.catalog.live.size} channels", 13.sp, color = TextSecondary)
+        }
+        Spacer(Modifier.height(10.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
+            items(state.catalog.live.take(14), key = { it.id }) { channel ->
+                CompactChannelCard(channel, channel.id in state.favorites) { onPlay(channel) }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Label("TV Guide", 20.sp, FontWeight.SemiBold)
+        Spacer(Modifier.height(9.dp))
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Panel)) {
+            state.catalog.live.take(3).forEachIndexed { index, channel ->
+                HomeGuideRow(channel, onPlay)
+                if (index < minOf(2, state.catalog.live.lastIndex)) HorizontalDivider(Color.White.copy(alpha = .07f))
+            }
         }
     }
 }
+
+@Composable
+private fun CompactChannelCard(media: MediaItem, favorite: Boolean, onClick: () -> Unit) {
+    FocusSurface(Modifier.width(184.dp).height(118.dp), onClick) {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF151A24)), contentAlignment = Alignment.Center) {
+                AsyncImage(media.logo, media.name, Modifier.fillMaxSize().padding(13.dp))
+                if (favorite) Icon(Icons.Default.Favorite, null, tint = Red, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(17.dp))
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)) {
+                Label(media.name, 13.sp, FontWeight.SemiBold)
+                Label(media.nowPlaying.ifBlank { "Live" }, 11.sp, color = TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeGuideRow(channel: MediaItem, onPlay: (MediaItem) -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().height(56.dp).background(if (focused) Red.copy(alpha = .25f) else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }.clickable { onPlay(channel) }.padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(channel.logo, null, Modifier.size(34.dp).clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = .06f)).padding(4.dp))
+        Spacer(Modifier.width(12.dp)); Label(channel.name, 14.sp, FontWeight.SemiBold)
+        Spacer(Modifier.width(20.dp)); Label("NOW", 11.sp, FontWeight.Bold, Red)
+        Spacer(Modifier.width(10.dp)); Box(Modifier.weight(1f)) { Label(channel.nowPlaying.ifBlank { "Live programming" }, 13.sp) }
+        Label(channel.nextPlaying.ifBlank { "Up next" }, 12.sp, color = TextSecondary)
+    }
+}
+
+@Composable
+private fun HorizontalDivider(color: Color) = Box(Modifier.fillMaxWidth().height(1.dp).background(color))
 
 @Composable
 private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onPlay: (MediaItem) -> Unit, onFavorite: (String) -> Unit) {
