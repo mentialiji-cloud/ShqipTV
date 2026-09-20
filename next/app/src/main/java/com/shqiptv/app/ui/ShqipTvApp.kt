@@ -214,7 +214,7 @@ private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (M
         Box(
             Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(
-                    listOf(Color(0xF205070D), Color(0xD905070D), Color(0x9A05070D))
+                    listOf(Color(0xD605070D), Color(0x9905070D), Color(0x4D05070D))
                 )
             )
         )
@@ -246,8 +246,12 @@ private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (M
             Label("${state.catalog.live.size} channels", 13.sp, color = TextSecondary)
         }
         Spacer(Modifier.height(10.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-            items(state.catalog.live.take(14), key = { it.id }) { channel ->
+        LazyRow(
+            modifier = Modifier.focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
+        ) {
+            items(state.catalog.live.take(14), key = { it.id }, contentType = { "home-channel" }) { channel ->
                 CompactChannelCard(channel, channel.id in state.favorites) { onPlay(channel) }
             }
         }
@@ -313,8 +317,11 @@ private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onP
         Column(Modifier.width(245.dp).fillMaxHeight().background(Color(0xFF0B0F19)).padding(22.dp)) {
             Label(title.uppercase(), 24.sp, FontWeight.Bold)
             Spacer(Modifier.height(18.dp))
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(categories, key = { it.id }) { cat ->
+            LazyColumn(
+                modifier = Modifier.focusGroup(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(categories, key = { it.id }, contentType = { "category" }) { cat ->
                     CategoryRow(cat.name, cat.id == selectedCategory) { selectedCategory = cat.id }
                 }
             }
@@ -328,14 +335,22 @@ private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onP
             if (kind in state.loadingKinds) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Label("Loading $title…", 19.sp, color = TextSecondary) }
             } else if (kind == ContentKind.LIVE) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(visible, key = { it.id }) { media ->
+                LazyColumn(
+                    modifier = Modifier.focusGroup(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(visible, key = { it.id }, contentType = { "live-channel" }) { media ->
                         ChannelRow(media, media.id in state.favorites, { onPlay(media) }) { onFavorite(media.id) }
                     }
                 }
             } else {
-                LazyVerticalGrid(GridCells.Adaptive(190.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(visible, key = { it.id }) { media ->
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(190.dp),
+                    modifier = Modifier.focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    items(visible, key = { it.id }, contentType = { "media-card" }) { media ->
                         ChannelCard(media, media.id in state.favorites, { onPlay(media) }, { onFavorite(media.id) })
                     }
                 }
@@ -348,8 +363,8 @@ private fun BrowserScreen(title: String, kind: ContentKind, state: AppState, onP
 private fun GuideScreen(state: AppState, onPlay: (MediaItem) -> Unit) {
     Column(Modifier.fillMaxSize().padding(34.dp)) {
         Label("TV GUIDE", 28.sp, FontWeight.Bold); Spacer(Modifier.height(20.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.catalog.live, key = { it.id }) { ChannelRow(it, false, { onPlay(it) }, {}) }
+        LazyColumn(modifier = Modifier.focusGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(state.catalog.live, key = { it.id }, contentType = { "guide-channel" }) { ChannelRow(it, false, { onPlay(it) }, {}) }
         }
     }
 }
@@ -359,8 +374,8 @@ private fun FavoritesScreen(state: AppState, onPlay: (MediaItem) -> Unit, onFavo
     val favorites = remember(state.catalog, state.favorites) { (state.catalog.live + state.catalog.movies).filter { it.id in state.favorites } }
     Column(Modifier.fillMaxSize().padding(34.dp)) {
         Label("FAVORITES", 28.sp, FontWeight.Bold); Spacer(Modifier.height(20.dp))
-        LazyVerticalGrid(GridCells.Adaptive(210.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(favorites, key = { it.id }) { ChannelCard(it, true, { onPlay(it) }, { onFavorite(it.id) }) }
+        LazyVerticalGrid(GridCells.Adaptive(210.dp), modifier = Modifier.focusGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(favorites, key = { it.id }, contentType = { "favorite" }) { ChannelCard(it, true, { onPlay(it) }, { onFavorite(it.id) }) }
         }
     }
 }
@@ -372,7 +387,7 @@ private fun SettingsScreen(state: AppState, onSignOut: () -> Unit) {
         Label("Playlist", 15.sp, color = TextSecondary); Spacer(Modifier.height(6.dp)); Label(state.provider?.name ?: "", 22.sp, FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp)); Label("${state.catalog.live.size} channels • ${state.catalog.movies.size} movies • ${state.catalog.series.size} series", 16.sp, color = TextSecondary)
         Spacer(Modifier.height(28.dp)); FocusButton("REMOVE PLAYLIST", selected = false, onClick = onSignOut)
-        Spacer(Modifier.weight(1f)); Label("Shqip TV 2.0 • Built for Google TV", 14.sp, color = TextSecondary)
+        Spacer(Modifier.weight(1f)); Label("Shqip TV 3.1 • Built for Google TV", 14.sp, color = TextSecondary)
     }
 }
 
@@ -393,8 +408,8 @@ private fun SeriesEpisodesScreen(series: MediaItem, state: AppState, onBack: () 
             } else if (state.episodes.isEmpty()) {
                 Label("No episodes were returned by this IPTV provider.", 17.sp, color = TextSecondary)
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    items(state.episodes, key = { it.id }) { episode -> ChannelRow(episode, false, { onPlay(episode) }, {}) }
+                LazyColumn(modifier = Modifier.focusGroup(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    items(state.episodes, key = { it.id }, contentType = { "episode" }) { episode -> ChannelRow(episode, false, { onPlay(episode) }, {}) }
                 }
             }
         }
