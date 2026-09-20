@@ -76,12 +76,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .onSuccess { (categories, items) ->
                     val latest = _state.value
                     val catalog = latest.catalog
-                    _state.value = latest.copy(
-                        catalog = catalog.copy(
+                    val updatedCatalog = catalog.copy(
                             categories = catalog.categories + categories,
                             movies = if (kind == ContentKind.MOVIE) items else catalog.movies,
                             series = if (kind == ContentKind.SERIES) items else catalog.series,
-                        ),
+                        )
+                    repository.saveCatalog(updatedCatalog)
+                    _state.value = latest.copy(
+                        catalog = updatedCatalog,
                         loadingKinds = latest.loadingKinds - kind,
                     )
                 }
