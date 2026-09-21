@@ -9,6 +9,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.concurrent.TimeUnit
 
 class XtreamClient {
@@ -18,6 +20,10 @@ class XtreamClient {
         .callTimeout(35, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
+
+    private val epgCache = Collections.synchronizedMap(object : LinkedHashMap<String, List<Program>>(96, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Program>>?) = size > 96
+    })
 
     private fun enc(value: String) = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
 
@@ -82,17 +88,23 @@ class XtreamClient {
         )
     }
 
-    suspend fun epg(p: Playlist, channelId: Int): List<Program> = runCatching {
-        val root = json(apiUrl(p, "get_short_epg", "&stream_id=$channelId&limit=4")).asJsonObject
-        (root.getAsJsonArray("epg_listings") ?: JsonArray()).map { e ->
-            val o = e.asJsonObject
-            Program(
-                title = decode(o.str("title")), description = decode(o.str("description")),
-                start = o.str("start_timestamp").toLongOrNull()?.times(1000) ?: 0,
-                end = o.str("stop_timestamp").toLongOrNull()?.times(1000) ?: 0
-            )
-        }
-    }.getOrDefault(emptyList())
+    suspend fun epg(p: Playlist, channelId: Int): List<Program> {
+        val key = "${p.id}:$channelId"
+        epgCache[key]?.let { return it }
+        val programs = runCatching {
+            val root = json(apiUrl(p, "get_short_epg", "&stream_id=$channelId&limit=4")).asJsonObject
+            (root.getAsJsonArray("epg_listings") ?: JsonArray()).map { e ->
+                val o = e.asJsonObject
+                Program(
+                    title = decode(o.str("title")), description = decode(o.str("description")),
+                    start = o.str("start_timestamp").toLongOrNull()?.times(1000) ?: 0,
+                    end = o.str("stop_timestamp").toLongOrNull()?.times(1000) ?: 0
+                )
+            }
+        }.getOrDefault(emptyList())
+        epgCache[key] = programs
+        return programs
+    }
 
     private fun decode(value: String): String = runCatching {
         String(android.util.Base64.decode(value, android.util.Base64.DEFAULT))
