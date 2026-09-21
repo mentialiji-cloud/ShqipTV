@@ -149,18 +149,15 @@ private fun MainShell(
     onFavorite: (String) -> Unit,
     onSignOut: () -> Unit,
 ) {
-    Row(Modifier.fillMaxSize()) {
-        NavigationRail(section, onSection)
-        Box(Modifier.weight(1f).fillMaxHeight()) {
-            when (section) {
-                Section.HOME -> HomeScreen(state, onSection, onPlay)
-                Section.LIVE -> BrowserScreen("Live TV", ContentKind.LIVE, state, onPlay, onFavorite)
-                Section.GUIDE -> GuideScreen(state, onPlay)
-                Section.MOVIES -> BrowserScreen("Movies", ContentKind.MOVIE, state, onPlay, onFavorite)
-                Section.SERIES -> BrowserScreen("Series", ContentKind.SERIES, state, onPlay, onFavorite)
-                Section.FAVORITES -> FavoritesScreen(state, onPlay, onFavorite)
-                Section.SETTINGS -> SettingsScreen(state, onSignOut)
-            }
+    Box(Modifier.fillMaxSize()) {
+        when (section) {
+            Section.HOME -> HomeScreen(state, onSection, onPlay)
+            Section.LIVE -> LiveTvScreen(state, onSection, onPlay)
+            Section.GUIDE -> GuideScreen(state, onPlay)
+            Section.MOVIES -> BrowserScreen("Movies", ContentKind.MOVIE, state, onPlay, onFavorite)
+            Section.SERIES -> BrowserScreen("Series", ContentKind.SERIES, state, onPlay, onFavorite)
+            Section.FAVORITES -> FavoritesScreen(state, onPlay, onFavorite)
+            Section.SETTINGS -> SettingsScreen(state, onSignOut)
         }
     }
 }
@@ -214,57 +211,136 @@ private fun HomeScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (M
         Box(
             Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(
-                    listOf(Color(0xD605070D), Color(0x9905070D), Color(0x4D05070D))
+                    listOf(Color(0xD905070D), Color(0x7305070D), Color(0x2405070D))
                 )
             )
         )
-        Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 22.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Label("Shqip TV", 28.sp, FontWeight.Bold)
-            Label(state.provider?.name ?: "Connected", 14.sp, color = TextSecondary)
+        Column(Modifier.fillMaxSize().padding(horizontal = 54.dp, vertical = 34.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Label("Shqip TV", 38.sp, FontWeight.Bold)
+                    Label("Më afër Shqipërisë", 15.sp, color = Color.White.copy(.78f))
+                }
+                Label(state.provider?.name ?: "My IPTV", 14.sp, color = Color.White.copy(.8f))
+            }
+            Spacer(Modifier.weight(1f))
+            Column(Modifier.width(520.dp)) {
+                Label("LIVE TV", 19.sp, color = Color.White.copy(.82f))
+                Spacer(Modifier.height(8.dp))
+                Label(featured?.name ?: "Shqip TV", 52.sp, FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Label(featured?.nowPlaying?.ifBlank { "Kultura na bashkon" } ?: "Kultura na bashkon", 24.sp)
+                Spacer(Modifier.height(22.dp))
+                FocusButton("▶  WATCH LIVE", selected = true) {
+                    if (featured != null) onPlay(featured) else onSection(Section.LIVE)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            CinemaBottomNav(onSection)
         }
-        Spacer(Modifier.height(16.dp))
-        Box(
-            Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(20.dp))
-                .background(Brush.horizontalGradient(listOf(Color(0xDB4A080B), Color(0xC4151A25), Color(0x90080B11))))
-                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(20.dp))
-        ) {
-            Column(Modifier.align(Alignment.CenterStart).padding(28.dp)) {
-                Box(Modifier.clip(RoundedCornerShape(20.dp)).background(Red).padding(horizontal = 12.dp, vertical = 5.dp)) { Label("●  LIVE TV", 12.sp, FontWeight.Bold) }
+    }
+}
+
+@Composable
+private fun CinemaBottomNav(onSection: (Section) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().focusGroup(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FocusButton("▣  LIVE TV", false) { onSection(Section.LIVE) }
+        Spacer(Modifier.width(18.dp)); FocusButton("▤  MOVIES", false) { onSection(Section.MOVIES) }
+        Spacer(Modifier.width(18.dp)); FocusButton("▥  SERIES", false) { onSection(Section.SERIES) }
+        Spacer(Modifier.width(18.dp)); FocusButton("♡  FAVORITES", false) { onSection(Section.FAVORITES) }
+        Spacer(Modifier.width(18.dp)); FocusButton("⚙", false) { onSection(Section.SETTINGS) }
+    }
+}
+
+@Composable
+private fun LiveTvScreen(state: AppState, onSection: (Section) -> Unit, onPlay: (MediaItem) -> Unit) {
+    val categories = remember(state.catalog) {
+        listOf(Category("*", "Të gjitha", ContentKind.LIVE)) + state.catalog.categories.filter { it.kind == ContentKind.LIVE }
+    }
+    var selectedCategory by remember { mutableStateOf("*") }
+    val channels = remember(state.catalog.live, selectedCategory) {
+        if (selectedCategory == "*") state.catalog.live else state.catalog.live.filter { it.categoryId == selectedCategory }
+    }
+    var selected by remember(channels) { mutableStateOf(channels.firstOrNull()) }
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF071323), Color(0xFF02060D))))) {
+        Image(painterResource(R.drawable.home_albania), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color(0xD907101D)))
+        Column(Modifier.fillMaxSize().padding(34.dp)) {
+            TopCinemaNav(Section.LIVE, onSection)
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.width(225.dp).fillMaxHeight().focusGroup(),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    items(categories, key = { it.id }, contentType = { "live-category" }) { category ->
+                        CategoryRow(category.name, selectedCategory == category.id) { selectedCategory = category.id }
+                    }
+                }
+                Spacer(Modifier.width(24.dp))
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.weight(1f).fillMaxHeight().focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(channels, key = { it.id }, contentType = { "live-grid-card" }) { channel ->
+                        LiveGridCard(channel, { selected = channel }) { onPlay(channel) }
+                    }
+                }
+            }
+            selected?.let { channel ->
                 Spacer(Modifier.height(12.dp))
-                Label(featured?.name ?: "Shqip TV", 34.sp, FontWeight.Bold)
-                Spacer(Modifier.height(5.dp))
-                Label(featured?.nowPlaying?.ifBlank { "Your channels. Fast and simple." } ?: "Your channels. Fast and simple.", 15.sp, color = TextSecondary)
-                Spacer(Modifier.height(16.dp))
-                FocusButton("▶  WATCH LIVE", true) { if (featured != null) onPlay(featured) else onSection(Section.LIVE) }
-            }
-            AsyncImage(featured?.logo, null, Modifier.align(Alignment.CenterEnd).padding(34.dp).size(138.dp))
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Label("Now Playing", 20.sp, FontWeight.SemiBold)
-            Label("${state.catalog.live.size} channels", 13.sp, color = TextSecondary)
-        }
-        Spacer(Modifier.height(10.dp))
-        LazyRow(
-            modifier = Modifier.focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp),
-        ) {
-            items(state.catalog.live.take(14), key = { it.id }, contentType = { "home-channel" }) { channel ->
-                CompactChannelCard(channel, channel.id in state.favorites) { onPlay(channel) }
+                Row(
+                    Modifier.fillMaxWidth().height(74.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xE80D1626)).padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AsyncImage(channel.logo, null, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(.07f)).padding(5.dp))
+                    Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) {
+                        Label(channel.name, 18.sp, FontWeight.Bold)
+                        Label(channel.nowPlaying.ifBlank { "Live now" }, 13.sp, color = TextSecondary)
+                    }
+                    Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Red).padding(horizontal = 10.dp, vertical = 5.dp)) { Label("● LIVE", 11.sp, FontWeight.Bold) }
+                }
             }
         }
-        Spacer(Modifier.height(18.dp))
-        Label("TV Guide", 20.sp, FontWeight.SemiBold)
-        Spacer(Modifier.height(9.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Panel)) {
-            state.catalog.live.take(3).forEachIndexed { index, channel ->
-                HomeGuideRow(channel, onPlay)
-                if (index < minOf(2, state.catalog.live.lastIndex)) HorizontalDivider(Color.White.copy(alpha = .07f))
-            }
+    }
+}
+
+@Composable
+private fun TopCinemaNav(selected: Section, onSection: (Section) -> Unit) {
+    Row(Modifier.fillMaxWidth().focusGroup(), verticalAlignment = Alignment.CenterVertically) {
+        Label("Shqip TV", 34.sp, FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
+        FocusButton("▣  LIVE TV", selected == Section.LIVE) { onSection(Section.LIVE) }
+        Spacer(Modifier.width(12.dp)); FocusButton("MOVIES", selected == Section.MOVIES) { onSection(Section.MOVIES) }
+        Spacer(Modifier.width(12.dp)); FocusButton("SERIES", selected == Section.SERIES) { onSection(Section.SERIES) }
+        Spacer(Modifier.width(12.dp)); FocusButton("FAVORITES", selected == Section.FAVORITES) { onSection(Section.FAVORITES) }
+        Spacer(Modifier.width(14.dp)); FocusButton("⌂", false) { onSection(Section.HOME) }
+    }
+}
+
+@Composable
+private fun LiveGridCard(media: MediaItem, onFocused: () -> Unit, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Column(
+        Modifier.height(142.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xE8131C2C))
+            .border(if (focused) 3.dp else 1.dp, if (focused) Red else Color.White.copy(.14f), RoundedCornerShape(14.dp))
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
+            .clickable(onClick = onClick).padding(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(media.logo, null, Modifier.size(54.dp).clip(RoundedCornerShape(9.dp)).background(Color.White.copy(.06f)).padding(6.dp))
+            Spacer(Modifier.weight(1f))
+            Label("● LIVE", 10.sp, FontWeight.Bold, Red)
         }
-        }
+        Spacer(Modifier.weight(1f))
+        Label(media.name, 16.sp, FontWeight.Bold)
+        Label(media.nowPlaying.ifBlank { "Live now" }, 12.sp, color = TextSecondary)
     }
 }
 
@@ -387,7 +463,7 @@ private fun SettingsScreen(state: AppState, onSignOut: () -> Unit) {
         Label("Playlist", 15.sp, color = TextSecondary); Spacer(Modifier.height(6.dp)); Label(state.provider?.name ?: "", 22.sp, FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp)); Label("${state.catalog.live.size} channels • ${state.catalog.movies.size} movies • ${state.catalog.series.size} series", 16.sp, color = TextSecondary)
         Spacer(Modifier.height(28.dp)); FocusButton("REMOVE PLAYLIST", selected = false, onClick = onSignOut)
-        Spacer(Modifier.weight(1f)); Label("Shqip TV 3.1 • Built for Google TV", 14.sp, color = TextSecondary)
+        Spacer(Modifier.weight(1f)); Label("Shqip TV 4.0 • Cinema Edition", 14.sp, color = TextSecondary)
     }
 }
 

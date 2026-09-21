@@ -12,8 +12,8 @@ android {
         applicationId = "com.shqiptv.app"
         minSdk = 23
         targetSdk = 36
-        versionCode = 7
-        versionName = "3.1.0"
+        versionCode = 8
+        versionName = "4.0.0"
     }
 
     buildTypes {
