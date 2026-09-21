@@ -25,8 +25,8 @@ jobs:
           gradle-version: "8.12"
       - name: Build release APK
         run: |
-          gradle -p EagleTV :app:assembleRelease --stacktrace
-          APK_PATH=$(find EagleTV/app/build/outputs/apk/release -name "*.apk" | head -n 1)\n          test -n "$APK_PATH"\n          cp "$APK_PATH" EagleTV.apk
+          gradle -p EagleTV :app:assembleDebug --stacktrace
+          APK_PATH=$(find EagleTV/app/build/outputs/apk/debug -name "*.apk" | head -n 1)\n          test -n "$APK_PATH"\n          cp "$APK_PATH" EagleTV.apk
       - uses: actions/upload-artifact@v4
         with:
           name: EagleTV-beta
