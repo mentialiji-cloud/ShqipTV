@@ -1,6 +1,5 @@
 package com.eagletv.player
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,6 +29,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -128,12 +128,16 @@ private fun TvField(label: String, value: String, password: Boolean = false, onC
 
 @Composable
 fun EagleShell(playlist: Playlist, client: XtreamClient, store: EagleStore, destination: Destination, onNavigate: (Destination) -> Unit, onProfiles: () -> Unit) {
+    if (destination == Destination.LIVE) {
+        ClassicLiveScreen(playlist, client, store, onHome = { onNavigate(Destination.HOME) })
+        return
+    }
     Row(Modifier.fillMaxSize()) {
         NavigationRail(destination, playlist.name, onNavigate, onProfiles)
         Box(Modifier.weight(1f).fillMaxHeight()) {
             when (destination) {
                 Destination.HOME -> HomeScreen(onNavigate)
-                Destination.LIVE -> BrowserScreen("Live TV", "live", playlist, client, store)
+                Destination.LIVE -> Unit
                 Destination.MOVIES -> BrowserScreen("Movies", "movie", playlist, client, store)
                 Destination.SERIES -> BrowserScreen("Series", "series", playlist, client, store)
                 Destination.FAVORITES -> BrowserScreen("Favorites", "favorites", playlist, client, store)
@@ -153,7 +157,7 @@ private fun NavigationRail(active: Destination, profile: String, onNavigate: (De
         Triple(Destination.SETTINGS, "Settings", Icons.Default.Settings)
     )
     Column(Modifier.width(208.dp).fillMaxHeight().background(Color(0xFF0D111B)).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { IconBox(Icons.Default.PlayArrow); Spacer(Modifier.width(12.dp)); Text("EagleTV", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 23.sp) }
+        Row(verticalAlignment = Alignment.CenterVertically) { IconBox(Icons.Default.PlayArrow); Spacer(Modifier.width(12.dp)); Text("EagleTV", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 23.sp); Spacer(Modifier.width(8.dp)); AlbanianFlag() }
         Spacer(Modifier.height(32.dp))
         entries.forEach { (dest, label, icon) -> NavButton(label, icon, active == dest) { onNavigate(dest) }; Spacer(Modifier.height(5.dp)) }
         Spacer(Modifier.weight(1f))
@@ -173,6 +177,152 @@ private fun NavigationRail(active: Destination, profile: String, onNavigate: (De
         }
     }
 }
+
+@Composable
+private fun ClassicLiveScreen(playlist: Playlist, client: XtreamClient, store: EagleStore, onHome: () -> Unit) {
+    var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
+    var categoryId by remember { mutableStateOf<String?>(null) }
+    var selected by remember { mutableStateOf<Channel?>(null) }
+    var epg by remember { mutableStateOf<List<Program>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var favorites by remember { mutableStateOf(store.favorites()) }
+    var fullscreen by remember { mutableStateOf(false) }
+    val preset = remember { store.buffer() }
+    val shown = remember(channels, categoryId, favorites) {
+        when (categoryId) {
+            "__favorites" -> channels.filter { it.id in favorites }
+            null -> channels
+            else -> channels.filter { it.categoryId == categoryId }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            coroutineScope {
+                val categoryRequest = async { client.categories(playlist, "live") }
+                val channelRequest = async { client.liveChannels(playlist) }
+                categories = categoryRequest.await()
+                channels = channelRequest.await()
+                selected = channels.firstOrNull()
+            }
+        }.onFailure { error = it.message ?: "Unable to load playlist" }
+        loading = false
+    }
+    LaunchedEffect(selected?.id) {
+        epg = emptyList()
+        val channel = selected ?: return@LaunchedEffect
+        delay(280)
+        epg = client.epg(playlist, channel.id)
+    }
+
+    val url = selected?.let { client.streamUrl(playlist, it) }
+    if (fullscreen && url != null) {
+        FullScreenPlayer(url, preset) { fullscreen = false }
+        return
+    }
+
+    BackHandler(onBack = onHome)
+    Column(Modifier.fillMaxSize().background(Ink)) {
+        Row(
+            Modifier.fillMaxWidth().height(66.dp).background(Color(0xFF0B1629)).padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Eagle", color = SoftWhite, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            Text("TV", color = Color(0xFF2484FF), fontSize = 28.sp, fontWeight = FontWeight.Black)
+            Spacer(Modifier.width(10.dp)); AlbanianFlag()
+            Spacer(Modifier.width(24.dp)); Box(Modifier.width(1.dp).height(26.dp).background(Color(0xFF40516B)))
+            Spacer(Modifier.width(24.dp)); Text("LIVE TV", color = SoftWhite, fontSize = 17.sp, letterSpacing = 3.sp)
+            Spacer(Modifier.weight(1f)); Text(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date()), color = Muted, fontSize = 17.sp)
+        }
+
+        if (loading) { LoadingState(); return@Column }
+        if (error != null) { EmptyState(error!!, Icons.Default.WifiOff); return@Column }
+
+        Row(Modifier.weight(1f)) {
+            LazyColumn(Modifier.width(245.dp).fillMaxHeight().background(Color(0xFF0A1322)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item { ClassicCategoryRow("★  Favorites", categoryId == "__favorites") { categoryId = "__favorites"; selected = channels.firstOrNull { it.id in favorites } } }
+                item { ClassicCategoryRow("☰  All channels", categoryId == null) { categoryId = null; selected = channels.firstOrNull() } }
+                items(categories, key = { it.id }) { category ->
+                    ClassicCategoryRow(category.name, categoryId == category.id) {
+                        categoryId = category.id
+                        selected = channels.firstOrNull { it.categoryId == category.id }
+                    }
+                }
+            }
+            LazyColumn(Modifier.width(620.dp).fillMaxHeight().background(Color(0xFF0D1728)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                items(shown, key = { it.id }) { channel ->
+                    ClassicChannelRow(
+                        channel = channel,
+                        selected = selected?.id == channel.id,
+                        favorite = channel.id in favorites,
+                        onFocus = { selected = channel },
+                        onOpen = { selected = channel; fullscreen = true }
+                    )
+                }
+            }
+            ClassicDetailsPanel(selected, epg, Modifier.weight(1f), onPlay = { if (url != null) fullscreen = true }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
+        }
+    }
+}
+
+@Composable
+private fun ClassicCategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().height(54.dp).onFocusChanged { focused = it.isFocused }.focusable()
+            .background(if (selected || focused) Color(0xFF1268F3) else Color.Transparent)
+            .clickable(onClick = onClick).padding(horizontal = 17.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) { Text(label, color = if (selected || focused) Color.White else Color(0xFFC1CBDA), fontSize = 16.sp, fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+}
+
+@Composable
+private fun ClassicChannelRow(channel: Channel, selected: Boolean, favorite: Boolean, onFocus: () -> Unit, onOpen: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().height(64.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.focusable()
+            .background(if (focused) Color(0xFF1268F3) else if (selected) Color(0xFF172943) else Color.Transparent)
+            .clickable(onClick = onOpen).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(channel.id.toString(), color = if (focused) Color.White else Muted, fontSize = 13.sp, modifier = Modifier.width(48.dp))
+        Box(Modifier.size(42.dp).background(Color(0xFF07101D)), contentAlignment = Alignment.Center) {
+            if (!channel.logo.isNullOrBlank()) AsyncImage(channel.logo, null, Modifier.fillMaxSize().padding(4.dp))
+            else androidx.tv.material3.Icon(Icons.Default.LiveTv, null, tint = Muted, modifier = Modifier.size(21.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(channel.name, color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (favorite) androidx.tv.material3.Icon(Icons.Default.Favorite, null, tint = if (focused) Color.White else EagleRed, modifier = Modifier.size(17.dp))
+    }
+}
+
+@Composable
+private fun ClassicDetailsPanel(item: Channel?, epg: List<Program>, modifier: Modifier, onPlay: () -> Unit, onFavorite: () -> Unit) {
+    val now = epg.firstOrNull()
+    val next = epg.getOrNull(1)
+    Column(modifier.fillMaxHeight().background(Color(0xFF07111F))) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 8.2f).background(Color(0xFF101D31)), contentAlignment = Alignment.Center) {
+            if (!item?.logo.isNullOrBlank()) AsyncImage(item?.logo, null, Modifier.size(150.dp).padding(14.dp))
+            else androidx.tv.material3.Icon(Icons.Default.LiveTv, null, tint = Color(0xFF40516B), modifier = Modifier.size(84.dp))
+        }
+        Column(Modifier.padding(24.dp)) {
+            Text("Now Playing", color = Color(0xFF3A91FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(now?.title ?: item?.name ?: "Choose a channel", color = SoftWhite, fontSize = 27.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (now != null) Text(timeRange(now), color = Muted, fontSize = 14.sp)
+            Spacer(Modifier.height(18.dp)); Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { ActionButton("Watch", onClick = onPlay); ActionButton("Favorite", secondary = true, onClick = onFavorite) }
+            Spacer(Modifier.height(22.dp)); Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF28374B)))
+            Spacer(Modifier.height(18.dp)); Text("Up Next", color = Color(0xFF3A91FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp)); Text(next?.title ?: "Guide information unavailable", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (next != null) Text(timeRange(next), color = Muted, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+private fun AlbanianFlag() { Text("🇦🇱", fontSize = 22.sp) }
 
 @Composable
 private fun HomeScreen(onNavigate: (Destination) -> Unit) {
@@ -263,8 +413,7 @@ private fun ChannelColumn(items: List<Channel>, selectedId: Int?, favorites: Set
 @Composable
 private fun DetailsPanel(item: Channel?, epg: List<Program>, url: String?, preset: BufferPreset, favorites: Set<Int>, modifier: Modifier, onPlay: () -> Unit, onFavorite: () -> Unit) {
     Column(modifier.fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Panel)) {
-        if (url != null) EaglePlayer(url, preset, Modifier.fillMaxWidth().aspectRatio(16f / 8.2f), preview = true)
-        else Box(Modifier.fillMaxWidth().aspectRatio(16f / 8.2f).background(PanelLight), contentAlignment = Alignment.Center) { AsyncImage(item?.logo, null, Modifier.size(120.dp)) }
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 8.2f).background(PanelLight), contentAlignment = Alignment.Center) { AsyncImage(item?.logo, null, Modifier.size(120.dp)) }
         Column(Modifier.padding(20.dp)) {
             Text(item?.name ?: "Choose an item", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Bold, maxLines = 2)
             if (item != null) {
@@ -329,7 +478,7 @@ private fun SettingsScreen(store: EagleStore, onProfiles: () -> Unit) {
 
 @Composable private fun FocusTile(onClick: () -> Unit, modifier: Modifier = Modifier, active: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val color by animateColorAsState(if (active || focused) EagleRed else PanelLight, label = "focus")
+    val color = if (active || focused) EagleRed else PanelLight
     Box(modifier.onFocusChanged { focused = it.isFocused }.focusable().clip(RoundedCornerShape(13.dp)).background(color).border(if (focused) 3.dp else 0.dp, Color.White, RoundedCornerShape(13.dp)).clickable(onClick = onClick), content = content)
 }
 
