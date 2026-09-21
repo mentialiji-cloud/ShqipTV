@@ -21,9 +21,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +56,7 @@ fun PlaylistScreen(store: EagleStore, client: XtreamClient, onOpen: (Playlist) -
                 item {
                     FocusTile(onClick = { adding = true }, modifier = Modifier.width(220.dp).height(150.dp)) {
                         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                            androidx.compose.material3.Icon(Icons.Default.Add, null, tint = SoftWhite, modifier = Modifier.size(34.dp))
+                            androidx.tv.material3.Icon(Icons.Default.Add, null, tint = SoftWhite, modifier = Modifier.size(34.dp))
                             Text("Add playlist", color = SoftWhite, fontSize = 18.sp)
                         }
                     }
@@ -162,7 +159,7 @@ private fun NavigationRail(active: Destination, profile: String, onNavigate: (De
         Spacer(Modifier.weight(1f))
         FocusTile(onClick = onProfiles, modifier = Modifier.fillMaxWidth().height(60.dp), active = false) {
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(Icons.Default.AccountCircle, null, tint = Muted); Spacer(Modifier.width(10.dp));
+                androidx.tv.material3.Icon(Icons.Default.AccountCircle, null, tint = Muted); Spacer(Modifier.width(10.dp));
                 Column { Text(profile, color = SoftWhite, fontSize = 14.sp, maxLines = 1); Text("Switch playlist", color = Muted, fontSize = 11.sp) }
             }
         }
@@ -172,7 +169,7 @@ private fun NavigationRail(active: Destination, profile: String, onNavigate: (De
 @Composable private fun NavButton(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     FocusTile(onClick, Modifier.fillMaxWidth().height(51.dp), active = selected) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(icon, null, tint = if (selected) Color.White else Muted, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(13.dp)); Text(label, color = if (selected) Color.White else Muted, fontSize = 16.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+            androidx.tv.material3.Icon(icon, null, tint = if (selected) Color.White else Muted, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(13.dp)); Text(label, color = if (selected) Color.White else Muted, fontSize = 16.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
         }
     }
 }
@@ -240,7 +237,7 @@ private fun BrowserScreen(title: String, kind: String, playlist: Playlist, clien
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CategoryColumn(categories, category, shownAllLabel = if (kind == "favorites") "Favorites" else "All", onSelect = { category = it; selected = allItems.firstOrNull { item -> it == null || item.categoryId == it } })
             ChannelColumn(shown, selected?.id, favorites, onFocused = { selected = it }, onOpen = { selected = it; if (it.streamType != "series") fullscreen = true }, onFavorite = { favorites = store.toggleFavorite(it.id) })
-            DetailsPanel(selected, epg, url, preset, favorites, onPlay = { if (url != null) fullscreen = true }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
+            DetailsPanel(selected, epg, url, preset, favorites, Modifier.weight(1f), onPlay = { if (url != null) fullscreen = true }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
         }
     }
 }
@@ -264,8 +261,8 @@ private fun ChannelColumn(items: List<Channel>, selectedId: Int?, favorites: Set
 }
 
 @Composable
-private fun DetailsPanel(item: Channel?, epg: List<Program>, url: String?, preset: BufferPreset, favorites: Set<Int>, onPlay: () -> Unit, onFavorite: () -> Unit) {
-    Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Panel)) {
+private fun DetailsPanel(item: Channel?, epg: List<Program>, url: String?, preset: BufferPreset, favorites: Set<Int>, modifier: Modifier, onPlay: () -> Unit, onFavorite: () -> Unit) {
+    Column(modifier.fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Panel)) {
         if (url != null) EaglePlayer(url, preset, Modifier.fillMaxWidth().aspectRatio(16f / 8.2f), preview = true)
         else Box(Modifier.fillMaxWidth().aspectRatio(16f / 8.2f).background(PanelLight), contentAlignment = Alignment.Center) { AsyncImage(item?.logo, null, Modifier.size(120.dp)) }
         Column(Modifier.padding(20.dp)) {
@@ -319,10 +316,10 @@ private fun SettingsScreen(store: EagleStore, onProfiles: () -> Unit) {
 
 @Composable private fun ChannelRow(item: Channel, selected: Boolean, favorite: Boolean, onFocus: () -> Unit, onClick: () -> Unit, onFavorite: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().height(66.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.focusable().clip(RoundedCornerShape(9.dp)).background(if (focused || selected) PanelLight else Color.Transparent).border(if (focused) 2.dp else 0.dp, if (focused) EagleRed else Color.Transparent, RoundedCornerShape(9.dp)).clickable(onClick = onClick).onKeyEvent { if (it.key == Key.Favorite) { onFavorite(); true } else false }.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Ink), contentAlignment = Alignment.Center) { if (!item.logo.isNullOrBlank()) AsyncImage(item.logo, null, Modifier.fillMaxSize().padding(5.dp)) else androidx.compose.material3.Icon(if (item.streamType == "live") Icons.Default.LiveTv else Icons.Default.Movie, null, tint = Muted) }
+    Row(Modifier.fillMaxWidth().height(66.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.focusable().clip(RoundedCornerShape(9.dp)).background(if (focused || selected) PanelLight else Color.Transparent).border(if (focused) 2.dp else 0.dp, if (focused) EagleRed else Color.Transparent, RoundedCornerShape(9.dp)).clickable(onClick = onClick).padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Ink), contentAlignment = Alignment.Center) { if (!item.logo.isNullOrBlank()) AsyncImage(item.logo, null, Modifier.fillMaxSize().padding(5.dp)) else androidx.tv.material3.Icon(if (item.streamType == "live") Icons.Default.LiveTv else Icons.Default.Movie, null, tint = Muted) }
         Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(item.name, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(item.streamType.replaceFirstChar { it.uppercase() }, color = Muted, fontSize = 11.sp) }
-        if (favorite) androidx.compose.material3.Icon(Icons.Default.Favorite, null, tint = EagleRed, modifier = Modifier.size(17.dp))
+        if (favorite) androidx.tv.material3.Icon(Icons.Default.Favorite, null, tint = EagleRed, modifier = Modifier.size(17.dp))
     }
 }
 
@@ -337,11 +334,11 @@ private fun SettingsScreen(store: EagleStore, onProfiles: () -> Unit) {
 }
 
 @Composable private fun ActionButton(label: String, enabled: Boolean = true, secondary: Boolean = false, onClick: () -> Unit) { FocusTile(if (enabled) onClick else ({}), Modifier.height(47.dp).widthIn(min = 112.dp), active = !secondary && enabled) { Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) { Text(label, color = if (enabled) SoftWhite else Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold) } } }
-@Composable private fun HeroCard(title: String, subtitle: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) { FocusTile(onClick, modifier.height(220.dp)) { Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(color, color.copy(alpha = .45f)))).padding(24.dp)) { androidx.compose.material3.Icon(icon, null, tint = Color.White.copy(.88f), modifier = Modifier.size(58.dp).align(Alignment.TopEnd)); Column(Modifier.align(Alignment.BottomStart)) { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black); Text(subtitle, color = Color.White.copy(.75f), fontSize = 15.sp) } } } }
-@Composable private fun SmallCard(title: String, icon: ImageVector, onClick: () -> Unit) { FocusTile(onClick, Modifier.width(230.dp).height(94.dp)) { Row(Modifier.fillMaxSize().padding(18.dp), verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.Icon(icon, null, tint = EagleRed, modifier = Modifier.size(30.dp)); Spacer(Modifier.width(14.dp)); Text(title, color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold) } } }
-@Composable private fun IconBox(icon: ImageVector, size: androidx.compose.ui.unit.Dp = 46.dp) { Box(Modifier.size(size).clip(RoundedCornerShape(12.dp)).background(EagleRed), contentAlignment = Alignment.Center) { androidx.compose.material3.Icon(icon, null, tint = Color.White, modifier = Modifier.size(size * .58f)) } }
+@Composable private fun HeroCard(title: String, subtitle: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) { FocusTile(onClick, modifier.height(220.dp)) { Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(color, color.copy(alpha = .45f)))).padding(24.dp)) { androidx.tv.material3.Icon(icon, null, tint = Color.White.copy(.88f), modifier = Modifier.size(58.dp).align(Alignment.TopEnd)); Column(Modifier.align(Alignment.BottomStart)) { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black); Text(subtitle, color = Color.White.copy(.75f), fontSize = 15.sp) } } } }
+@Composable private fun SmallCard(title: String, icon: ImageVector, onClick: () -> Unit) { FocusTile(onClick, Modifier.width(230.dp).height(94.dp)) { Row(Modifier.fillMaxSize().padding(18.dp), verticalAlignment = Alignment.CenterVertically) { androidx.tv.material3.Icon(icon, null, tint = EagleRed, modifier = Modifier.size(30.dp)); Spacer(Modifier.width(14.dp)); Text(title, color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold) } } }
+@Composable private fun IconBox(icon: ImageVector, size: androidx.compose.ui.unit.Dp = 46.dp) { Box(Modifier.size(size).clip(RoundedCornerShape(12.dp)).background(EagleRed), contentAlignment = Alignment.Center) { androidx.tv.material3.Icon(icon, null, tint = Color.White, modifier = Modifier.size(size * .58f)) } }
 @Composable private fun BrandHeader(title: String, subtitle: String) { Row(verticalAlignment = Alignment.CenterVertically) { IconBox(Icons.Default.PlayArrow, 58.dp); Spacer(Modifier.width(18.dp)); Column { Text(title, color = SoftWhite, fontSize = 32.sp, fontWeight = FontWeight.Black); Text(subtitle, color = Muted, fontSize = 16.sp) } } }
 @Composable private fun LoadingState() { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Loading your library…", color = Muted, fontSize = 18.sp) } }
-@Composable private fun EmptyState(text: String, icon: ImageVector) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { androidx.compose.material3.Icon(icon, null, tint = Muted, modifier = Modifier.size(44.dp)); Spacer(Modifier.height(12.dp)); Text(text, color = Muted, fontSize = 17.sp) } } }
+@Composable private fun EmptyState(text: String, icon: ImageVector) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { androidx.tv.material3.Icon(icon, null, tint = Muted, modifier = Modifier.size(44.dp)); Spacer(Modifier.height(12.dp)); Text(text, color = Muted, fontSize = 17.sp) } } }
 private fun dayPart(): String { val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY); return when (h) { in 5..11 -> "morning"; in 12..17 -> "afternoon"; else -> "evening" } }
 private fun timeRange(p: Program): String { val f = SimpleDateFormat("h:mm a", Locale.getDefault()); return if (p.start > 0) "${f.format(Date(p.start))} – ${f.format(Date(p.end))}" else "" }
