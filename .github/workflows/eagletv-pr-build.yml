@@ -20,11 +20,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.12"
       - name: Build release APK
         run: |
-          chmod +x gradlew
-          ./gradlew -p EagleTV :app:assembleRelease --stacktrace
+          gradle -p EagleTV :app:assembleRelease --stacktrace
           cp EagleTV/app/build/outputs/apk/release/app-release.apk EagleTV.apk
       - uses: actions/upload-artifact@v4
         with:
