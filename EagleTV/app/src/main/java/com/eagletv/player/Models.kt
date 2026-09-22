@@ -5,7 +5,9 @@ data class Playlist(
     val name: String,
     val server: String,
     val username: String,
-    val password: String
+    val password: String,
+    val kind: String = "xtream",
+    val m3uUrl: String = ""
 ) {
     val normalizedServer: String get() = server.trim().trimEnd('/')
 }
@@ -22,7 +24,8 @@ data class Channel(
     val extension: String = "ts",
     val rating: Double? = null,
     val plot: String? = null,
-    val year: String? = null
+    val year: String? = null,
+    val directUrl: String? = null
 )
 
 data class Program(

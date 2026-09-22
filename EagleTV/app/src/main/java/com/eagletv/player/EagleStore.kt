@@ -46,6 +46,16 @@ class EagleStore(context: Context) {
         prefs.edit().putString("recent_channels", gson.toJson(updated)).apply()
     }
 
+    fun recentChannelItems(): List<Channel> = runCatching {
+        gson.fromJson<List<Channel>>(prefs.getString("recent_channel_items", "[]"), object : TypeToken<List<Channel>>() {}.type)
+    }.getOrDefault(emptyList())
+
+    fun addRecentChannel(channel: Channel) {
+        addRecentChannel(channel.id)
+        val updated = (listOf(channel) + recentChannelItems().filterNot { it.id == channel.id }).take(20)
+        prefs.edit().putString("recent_channel_items", gson.toJson(updated)).apply()
+    }
+
     fun buffer(): BufferPreset = runCatching {
         BufferPreset.valueOf(prefs.getString("buffer", BufferPreset.AUTO.name)!!)
     }.getOrDefault(BufferPreset.AUTO)
