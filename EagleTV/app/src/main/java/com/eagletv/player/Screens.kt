@@ -1,5 +1,6 @@
 package com.eagletv.player
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -137,7 +143,7 @@ fun EagleShell(playlist: Playlist, client: XtreamClient, store: EagleStore, dest
         NavigationRail(destination, playlist.name, onNavigate, onProfiles)
         Box(Modifier.weight(1f).fillMaxHeight()) {
             when (destination) {
-                Destination.HOME -> HomeScreen(onNavigate)
+                Destination.HOME -> HomeScreen(playlist, client, store)
                 Destination.LIVE -> Unit
                 Destination.MOVIES -> BrowserScreen("Movies", "movie", playlist, client, store)
                 Destination.SERIES -> BrowserScreen("Series", "series", playlist, client, store)
@@ -259,11 +265,11 @@ private fun ClassicLiveScreen(playlist: Playlist, client: XtreamClient, store: E
                         selected = selected?.id == channel.id,
                         favorite = channel.id in favorites,
                         onFocus = { selected = channel },
-                        onOpen = { selected = channel; fullscreen = true }
+                        onOpen = { selected = channel; store.addRecentChannel(channel.id); fullscreen = true }
                     )
                 }
             }
-            ClassicDetailsPanel(selected, epg, Modifier.weight(1f), onPlay = { if (url != null) fullscreen = true }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
+            ClassicDetailsPanel(selected, epg, Modifier.weight(1f), onPlay = { if (url != null) { selected?.let { store.addRecentChannel(it.id) }; fullscreen = true } }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
         }
     }
 }
@@ -272,9 +278,9 @@ private fun ClassicLiveScreen(playlist: Playlist, client: XtreamClient, store: E
 private fun ClassicCategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().height(54.dp).onFocusChanged { focused = it.isFocused }.focusable()
+        Modifier.fillMaxWidth().height(54.dp).onFocusChanged { focused = it.isFocused }.remoteClick(onClick)
             .background(if (selected || focused) Color(0xFF1268F3) else Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 17.dp),
+            .padding(horizontal = 17.dp),
         verticalAlignment = Alignment.CenterVertically
     ) { Text(label, color = if (selected || focused) Color.White else Color(0xFFC1CBDA), fontSize = 16.sp, fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
@@ -283,9 +289,9 @@ private fun ClassicCategoryRow(label: String, selected: Boolean, onClick: () -> 
 private fun ClassicChannelRow(channel: Channel, selected: Boolean, favorite: Boolean, onFocus: () -> Unit, onOpen: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().height(64.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.focusable()
+        Modifier.fillMaxWidth().height(64.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.remoteClick(onOpen)
             .background(if (focused) Color(0xFF1268F3) else if (selected) Color(0xFF172943) else Color.Transparent)
-            .clickable(onClick = onOpen).padding(horizontal = 14.dp),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(channel.id.toString(), color = if (focused) Color.White else Muted, fontSize = 13.sp, modifier = Modifier.width(48.dp))
@@ -326,23 +332,65 @@ private fun ClassicDetailsPanel(item: Channel?, epg: List<Program>, modifier: Mo
 private fun AlbanianFlag() { Text("🇦🇱", fontSize = 22.sp) }
 
 @Composable
-private fun HomeScreen(onNavigate: (Destination) -> Unit) {
-    Column(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF17233E), Ink))).padding(38.dp)) {
-        Text("Good ${dayPart()}", color = Muted, fontSize = 16.sp)
-        Text("What would you like to watch?", color = SoftWhite, fontSize = 34.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(30.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            HeroCard("Live TV", "Channels and guide", Icons.Default.LiveTv, EagleRed, Modifier.weight(1.3f)) { onNavigate(Destination.LIVE) }
-            HeroCard("Movies", "Browse your library", Icons.Default.Movie, Color(0xFF325BFF), Modifier.weight(1f)) { onNavigate(Destination.MOVIES) }
-            HeroCard("Series", "Continue watching", Icons.Default.VideoLibrary, Color(0xFF7C4DFF), Modifier.weight(1f)) { onNavigate(Destination.SERIES) }
+private fun HomeScreen(playlist: Playlist, client: XtreamClient, store: EagleStore) {
+    var recent by remember { mutableStateOf<List<Channel>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var selected by remember { mutableStateOf<Channel?>(null) }
+    var fullscreen by remember { mutableStateOf(false) }
+    val preset = remember { store.buffer() }
+
+    LaunchedEffect(playlist.id) {
+        val ids = store.recentChannels()
+        if (ids.isNotEmpty()) {
+            val channels = runCatching { client.liveChannels(playlist) }.getOrDefault(emptyList()).associateBy { it.id }
+            recent = ids.mapNotNull(channels::get)
+            selected = recent.firstOrNull()
         }
-        Spacer(Modifier.height(28.dp))
-        Text("Quick access", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            SmallCard("Favorites", Icons.Default.Favorite) { onNavigate(Destination.FAVORITES) }
-            SmallCard("Search", Icons.Default.Search) { onNavigate(Destination.SEARCH) }
-            SmallCard("Playback settings", Icons.Default.Tune) { onNavigate(Destination.SETTINGS) }
+        loading = false
+    }
+
+    val url = selected?.let { client.streamUrl(playlist, it) }
+    if (fullscreen && url != null) {
+        FullScreenPlayer(url, preset) { fullscreen = false }
+        return
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Image(painterResource(R.drawable.eagletv_castle_home), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE8151B28), Color(0xA6192130), Color(0x54141A23)))))
+        Column(Modifier.fillMaxSize().padding(horizontal = 46.dp, vertical = 38.dp)) {
+            Text("Good ${dayPart()}", color = Color.White.copy(alpha = .78f), fontSize = 17.sp)
+            Text("Welcome back", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Black)
+            Spacer(Modifier.weight(.42f))
+            Text("Recently Watched", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Black)
+            Text("Continue from where you left off", color = Color.White.copy(alpha = .72f), fontSize = 14.sp)
+            Spacer(Modifier.height(17.dp))
+            when {
+                loading -> Text("Loading recent channels…", color = Color.White.copy(alpha = .72f), fontSize = 17.sp)
+                recent.isEmpty() -> Box(Modifier.fillMaxWidth().height(175.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xA6222934)).border(1.dp, Color.White.copy(alpha = .22f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        androidx.tv.material3.Icon(Icons.Default.History, null, tint = Color.White.copy(alpha = .75f), modifier = Modifier.size(38.dp))
+                        Spacer(Modifier.height(10.dp)); Text("Your recently watched channels will appear here", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Open Live TV and play any channel to begin", color = Color.White.copy(alpha = .68f), fontSize = 14.sp)
+                    }
+                }
+                else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
+                    items(recent, key = { it.id }) { channel ->
+                        FocusTile(onClick = { selected = channel; store.addRecentChannel(channel.id); fullscreen = true }, modifier = Modifier.width(228.dp).height(148.dp)) {
+                            Box(Modifier.fillMaxSize().background(Color(0xD91A2230)).padding(16.dp)) {
+                                Box(Modifier.size(62.dp).clip(RoundedCornerShape(12.dp)).background(Color.White), contentAlignment = Alignment.Center) {
+                                    if (!channel.logo.isNullOrBlank()) AsyncImage(channel.logo, null, Modifier.fillMaxSize().padding(7.dp)) else androidx.tv.material3.Icon(Icons.Default.LiveTv, null, tint = Ink)
+                                }
+                                Column(Modifier.align(Alignment.BottomStart)) {
+                                    Text(channel.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Press OK to watch", color = Color.White.copy(alpha = .62f), fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.weight(.35f))
         }
     }
 }
@@ -387,8 +435,8 @@ private fun BrowserScreen(title: String, kind: String, playlist: Playlist, clien
         if (error != null) { EmptyState(error!!, Icons.Default.WifiOff); return@Column }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CategoryColumn(categories, category, shownAllLabel = if (kind == "favorites") "Favorites" else "All", onSelect = { category = it; selected = allItems.firstOrNull { item -> it == null || item.categoryId == it } })
-            ChannelColumn(shown, selected?.id, favorites, onFocused = { selected = it }, onOpen = { selected = it; if (it.streamType != "series") fullscreen = true }, onFavorite = { favorites = store.toggleFavorite(it.id) })
-            DetailsPanel(selected, epg, url, preset, favorites, Modifier.weight(1f), onPlay = { if (url != null) fullscreen = true }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
+            ChannelColumn(shown, selected?.id, favorites, onFocused = { selected = it }, onOpen = { selected = it; if (it.streamType != "series") { if (it.streamType == "live") store.addRecentChannel(it.id); fullscreen = true } }, onFavorite = { favorites = store.toggleFavorite(it.id) })
+            DetailsPanel(selected, epg, url, preset, favorites, Modifier.weight(1f), onPlay = { if (url != null) { selected?.takeIf { it.streamType == "live" }?.let { store.addRecentChannel(it.id) }; fullscreen = true } }, onFavorite = { selected?.let { favorites = store.toggleFavorite(it.id) } })
         }
     }
 }
@@ -466,7 +514,7 @@ private fun SettingsScreen(store: EagleStore, onProfiles: () -> Unit) {
 
 @Composable private fun ChannelRow(item: Channel, selected: Boolean, favorite: Boolean, onFocus: () -> Unit, onClick: () -> Unit, onFavorite: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().height(66.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.focusable().clip(RoundedCornerShape(9.dp)).background(if (focused || selected) PanelLight else Color.Transparent).border(if (focused) 2.dp else 0.dp, if (focused) EagleRed else Color.Transparent, RoundedCornerShape(9.dp)).clickable(onClick = onClick).padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(66.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }.remoteClick(onClick).clip(RoundedCornerShape(9.dp)).background(if (focused || selected) PanelLight else Color.Transparent).border(if (focused) 2.dp else 0.dp, if (focused) EagleRed else Color.Transparent, RoundedCornerShape(9.dp)).padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Ink), contentAlignment = Alignment.Center) { if (!item.logo.isNullOrBlank()) AsyncImage(item.logo, null, Modifier.fillMaxSize().padding(5.dp)) else androidx.tv.material3.Icon(if (item.streamType == "live") Icons.Default.LiveTv else Icons.Default.Movie, null, tint = Muted) }
         Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(item.name, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(item.streamType.replaceFirstChar { it.uppercase() }, color = Muted, fontSize = 11.sp) }
         if (favorite) androidx.tv.material3.Icon(Icons.Default.Favorite, null, tint = EagleRed, modifier = Modifier.size(17.dp))
@@ -480,8 +528,18 @@ private fun SettingsScreen(store: EagleStore, onProfiles: () -> Unit) {
 @Composable private fun FocusTile(onClick: () -> Unit, modifier: Modifier = Modifier, active: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val color = if (active || focused) EagleRed else PanelLight
-    Box(modifier.onFocusChanged { focused = it.isFocused }.focusable().clip(RoundedCornerShape(13.dp)).background(color).border(if (focused) 3.dp else 0.dp, Color.White, RoundedCornerShape(13.dp)).clickable(onClick = onClick), content = content)
+    Box(modifier.onFocusChanged { focused = it.isFocused }.remoteClick(onClick).clip(RoundedCornerShape(13.dp)).background(color).border(if (focused) 3.dp else 0.dp, Color.White, RoundedCornerShape(13.dp)), content = content)
 }
+
+private fun Modifier.remoteClick(onClick: () -> Unit): Modifier =
+    onPreviewKeyEvent { event ->
+        val keyCode = event.nativeKeyEvent.keyCode
+        val isSelect = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER || keyCode == AndroidKeyEvent.KEYCODE_ENTER || keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER
+        if (!isSelect) false else {
+            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) onClick()
+            true
+        }
+    }.clickable(onClick = onClick).focusable()
 
 @Composable private fun ActionButton(label: String, enabled: Boolean = true, secondary: Boolean = false, onClick: () -> Unit) { FocusTile(if (enabled) onClick else ({}), Modifier.height(47.dp).widthIn(min = 112.dp), active = !secondary && enabled) { Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) { Text(label, color = if (enabled) SoftWhite else Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold) } } }
 @Composable private fun HeroCard(title: String, subtitle: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) { FocusTile(onClick, modifier.height(220.dp)) { Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(color, color.copy(alpha = .45f)))).padding(24.dp)) { androidx.tv.material3.Icon(icon, null, tint = Color.White.copy(.88f), modifier = Modifier.size(58.dp).align(Alignment.TopEnd)); Column(Modifier.align(Alignment.BottomStart)) { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black); Text(subtitle, color = Color.White.copy(.75f), fontSize = 15.sp) } } } }

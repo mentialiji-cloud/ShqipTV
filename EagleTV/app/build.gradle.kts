@@ -12,8 +12,8 @@ android {
         applicationId = "com.eagletv.player"
         minSdk = 23
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0-beta2"
+        versionCode = 3
+        versionName = "1.2.0-beta3"
     }
 
     buildTypes {
